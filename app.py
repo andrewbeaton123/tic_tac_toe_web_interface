@@ -46,6 +46,8 @@ def make_move():
             
             except requests.exceptions.RequestException as e:
                 print(f"Error sending request: {e}")
+                return jsonify({"error":f"There was an error with the game server {e}"})
+
             
             except json.JSONDecodeError:
                 print("Error decoding JSON response.")
