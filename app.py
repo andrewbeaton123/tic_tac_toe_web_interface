@@ -4,6 +4,12 @@ import requests
 import json
 from tic_tac_toe_game import TicTacToe  # Import your TicTacToe class
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
@@ -28,12 +34,16 @@ def make_move():
         #
         try:
 
-            url = "http://127.0.0.1:8000/next_move"
-            headers = {"Content-Type": "application/json"}
+            url = os.environ.get("ENDPOINT_URL")#"http://127.0.0.1:8000/next_move"
+            headers = {"Content-Type": "application/json",
+                       "ocp-apim-subscription-key":os.environ.get("OCP_APIM_SUBSCRIPTION_KEY")}
+            
             payload = {
             "current_player": 2,
-            "game_state": board_state
+            "game_state": [i for l in board_state for i in l]#[i for i in  for l  in board_state]
                 }
+            
+            
             try:
                 response = requests.post(url, headers=headers, data=json.dumps(payload))
                 response.raise_for_status()  # Raise an exception for bad status codes

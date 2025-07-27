@@ -21,6 +21,11 @@ A simple web-based Tic Tac Toe game built with Python.
     ```bash
     pip install -r requirements.txt
     ```
+3.  Ensure API endpoint is running for opponent 
+
+4. Ensure that ngrok endpoint is running in the same location as the api 
+
+5. Ensure Azure API authentication is enabled with the current ngrok address
 
 ## Usage
 
