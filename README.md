@@ -8,6 +8,7 @@ A simple web-based Tic Tac Toe game built with Python.
 - Interactive and user-friendly interface
 - Single-player and/or two-player modes (customize as needed)
 - Clean, readable codebase
+- **Input Validation:** The application now includes input validation to ensure that the row and column inputs are valid integers within the allowed range.
 
 ## Installation
 
@@ -28,6 +29,9 @@ A simple web-based Tic Tac Toe game built with Python.
 5. Ensure Azure API authentication is enabled with the current ngrok address
 
 ## Usage
+
+1. The game state is now managed using the Flask application context.
+2. Run the application:
 
 1. Run the application:
     ```bash
