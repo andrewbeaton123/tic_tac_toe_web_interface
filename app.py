@@ -3,6 +3,7 @@ import logging
 import requests
 import json
 from tic_tac_toe_game import TicTacToe  # Import your TicTacToe class
+from tic_tac_toe_web_interface import game_logic
 
 from dotenv import load_dotenv
 import os
@@ -16,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 @app.route('/')
 def index():
     if 'game' not in app.config:
-        app.config['game'] = TicTacToe(starting_player=1)
+        app.config['game'] = game_logic.init_game()
     return render_template('index.html')
 
 @app.route('/make_move', methods=['POST'])
@@ -32,11 +33,12 @@ def make_move():
 
     # For simplicity, we'll use a global game instance
     #global game
-    if not game.is_game_over() and (row, col) in game.get_valid_moves():
+    if game_logic.make_move(game,row,col):
 
 
-
-        game.make_move(row, col)
+        winner = game.winner
+        board_state = game.board.tolist()
+        #
         winner = game.winner
         board_state = game.board.tolist()
         #
@@ -87,5 +89,5 @@ def reset():
 if __name__ == '__main__':
     #game = TicTacToe(starting_player=1)
     with app.app_context():
-        app.config['game'] = TicTacToe(starting_player=1)
+        app.config['game'] = game_logic.init_game()
     app.run(debug=True)
