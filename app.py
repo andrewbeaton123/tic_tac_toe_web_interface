@@ -1,4 +1,44 @@
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logging.exception(e)
+    return jsonify({"error": str(e)}), 500
+    try:
+        url = os.environ.get("ENDPOINT_URL")#"http://127.0.0.1:8000/next_move" # URL for the AI's next move
+        headers = {"Content-Type": "application/json",
+                   "ocp-apim-subscription-key":os.environ.get("OCP_APIM_SUBSCRIPTION_KEY")} # Setting the header for JSON communication and Authentication
+
+        payload = {
+        "current_player": 2,
+        "game_state": [i for l in board_state for i in l]#[i for i in  for l  in board_state]
+            } # Payload with the current game state
+
+
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()  # Raise an exception for bad status codes
+        next_move = response.json()["move"]
+        logging.info(f"Next Move:{next_move}")
+        return next_move
+
+    except requests.exceptions.RequestException as e:
+        logging.exception(f"Error sending request: {e}")
+        raise Exception(f"There was an error with the game server {e}")
+
+    except json.JSONDecodeError:
+        logging.exception("Error decoding JSON response.")
+        raise Exception("Error decoding JSON response.")
+
 from flask import Flask, render_template, request, jsonify, current_app
+import logging
+import requests
+import json
+from tic_tac_toe_game import TicTacToe  # Import your TicTacToe class
+from tic_tac_toe_web_interface import game_logic
+
+from dotenv import load_dotenv
+import os
+from flask import Flask, jsonify
+
 import logging
 import requests
 import json
@@ -35,49 +75,20 @@ def make_move():
     #global game
     try:
         game_logic.make_move(game,row,col)
-        winner = game.winner
         board_state = game.board.tolist()
-        #
+        next_move = _get_next_move(board_state)
+        game.make_move(*game.get_valid_moves()[int(next_move)])
+        final_board = game.board.tolist()
         winner = game.winner
-        board_state = game.board.tolist()
-        #
-        try:
-
-            url = os.environ.get("ENDPOINT_URL")#"http://127.0.0.1:8000/next_move" # URL for the AI's next move
-            headers = {"Content-Type": "application/json",
-                       "ocp-apim-subscription-key":os.environ.get("OCP_APIM_SUBSCRIPTION_KEY")} # Setting the header for JSON communication and Authentication
-
-            payload = {
-            "current_player": 2,
-            "game_state": [i for l in board_state for i in l]#[i for i in  for l  in board_state]
-                } # Payload with the current game state
-
-
-            try:
-                response = requests.post(url, headers=headers, data=json.dumps(payload))
-                response.raise_for_status()  # Raise an exception for bad status codes
-                next_move = response.json()["move"]
-                logging.info(f"Next Move:{next_move}")
-                game.make_move(*game.get_valid_moves()[int(next_move)])
-                final_board = game.board.tolist()
-                winner = game.winner
-                return jsonify({'board': final_board, 'winner': winner})
-
-            except requests.exceptions.RequestException as e:
-                logging.exception(f"Error sending request: {e}")
-                return jsonify({"error":f"There was an error with the game server {e}"})
-
-            except json.JSONDecodeError:
-                logging.exception("Error decoding JSON response.")
-
-        except ValueError as e:
-            logging.error(f"Invalid move: {e}")
-            return jsonify({'error': str(e)}), 400
+        return jsonify({'board': final_board, 'winner': winner})
 
     except game_logic.InvalidMoveError as e:
         return jsonify({"error": str(e)}), 400
     except game_logic.GameOverError as e:
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
     return jsonify({'error': "Move not valid or game over"}), 400
 
