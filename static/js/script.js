@@ -1,0 +1,76 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const board = document.getElementById('board');
+    const resetButton = document.getElementById('reset-button');
+    
+    resetButton.addEventListener('click', resetGame);
+
+    // Generate the board
+    for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.dataset.index = i;
+        cell.addEventListener('click', handleCellClick);
+        board.appendChild(cell);
+    }
+
+    function updateBoard(boardState) {
+        const cells = document.querySelectorAll('.cell');
+        for (let i = 0; i < cells.length; i++) {
+            const row = Math.floor(i / 3);
+            const col = i % 3;
+            const value = boardState[row][col];
+            cells[i].textContent = value === 1 ? 'X' : value === 2 ? 'O' : '';
+        }
+    }
+
+    function handleCellClick(event) {
+        const index = event.target.dataset.index;
+        const row = Math.floor(index / 3);
+        const col = index % 3;
+        
+        fetch('/make_move', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({row, col})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            updateBoard(data.board);
+            if (data.winner !== null) {
+                setTimeout(() => {
+                    if (data.winner === 0) {
+                        alert("It's a draw!");
+                    } else {
+                        alert(`Player ${data.winner === 1 ? 'X' : 'O'} wins!`);
+                    }
+                    resetGame();
+                }, 100);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function resetGame() {
+        fetch('/reset', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            updateBoard(data.board);
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    // Initialize the board state
+    resetGame();
+});
