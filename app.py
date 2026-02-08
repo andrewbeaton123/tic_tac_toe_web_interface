@@ -31,11 +31,10 @@ def make_move():
     if not 0 <= row <= 2 or not 0 <= col <= 2:
         return jsonify({'error': 'Row and column must be between 0 and 2'}), 400
 
-    # For simplicity, we'll use a global game instance
+    # For Simplicity, we'll use a global game instance
     #global game
-    if game_logic.make_move(game,row,col):
-
-
+    try:
+        game_logic.make_move(game,row,col)
         winner = game.winner
         board_state = game.board.tolist()
         #
@@ -47,7 +46,7 @@ def make_move():
             url = os.environ.get("ENDPOINT_URL")#"http://127.0.0.1:8000/next_move" # URL for the AI's next move
             headers = {"Content-Type": "application/json",
                        "ocp-apim-subscription-key":os.environ.get("OCP_APIM_SUBSCRIPTION_KEY")} # Setting the header for JSON communication and Authentication
-            
+
             payload = {
             "current_player": 2,
             "game_state": [i for l in board_state for i in l]#[i for i in  for l  in board_state]
@@ -74,6 +73,11 @@ def make_move():
         except ValueError as e:
             logging.error(f"Invalid move: {e}")
             return jsonify({'error': str(e)}), 400
+
+    except game_logic.InvalidMoveError as e:
+        return jsonify({"error": str(e)}), 400
+    except game_logic.GameOverError as e:
+        return jsonify({"error": str(e)}), 400
 
     return jsonify({'error': "Move not valid or game over"}), 400
 
