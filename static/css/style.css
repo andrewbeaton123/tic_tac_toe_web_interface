@@ -22,6 +22,18 @@
     --error-color: #ef4444; /* Red 500 */
 }
 
+[data-theme="dark"] {
+    --bg-color: #0f172a; /* Slate 900 */
+    --card-bg: #1e293b; /* Slate 800 */
+    --text-main: #f8fafc; /* Slate 50 */
+    --text-muted: #94a3b8; /* Slate 400 */
+    --border-color: #334155; /* Slate 700 */
+    --cell-hover: #334155; /* Slate 700 */
+    
+    --x-color: #f1f5f9; /* Slate 100 */
+    --o-color: #64748b; /* Slate 500 */
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background-color: var(--bg-color);
@@ -33,6 +45,7 @@ body {
     padding: 20px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .container {
@@ -45,6 +58,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 32px;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 header {
@@ -237,6 +251,27 @@ footer p {
     font-size: 0.75rem;
     color: var(--text-muted);
     opacity: 0.8;
+}
+
+#theme-toggle {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+#theme-toggle:hover {
+    color: var(--text-main);
+    background-color: var(--cell-hover);
 }
 
 /* Mobile responsive adjustments */
