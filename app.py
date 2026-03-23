@@ -8,7 +8,6 @@ import numpy as np
 from flask import Flask, render_template, request, jsonify, session
 from dotenv import load_dotenv
 from tic_tac_toe_game import TicTacToe
-import game_logic
 
 load_dotenv()
 
@@ -18,10 +17,14 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-key-789456123")
 logging.basicConfig(level=logging.INFO)
 
 
+def init_game():
+    return TicTacToe(1)
+
+
 def get_game():
     """Retrieve or initialize game from session."""
     if 'game_state' not in session:
-        game = game_logic.init_game()
+        game = init_game()
         save_game(game)
         return game
 
@@ -31,7 +34,7 @@ def get_game():
         return pickle.loads(game_data)
     except Exception as e:
         logging.error(f"Failed to load game from session: {e}")
-        game = game_logic.init_game()
+        game = init_game()
         save_game(game)
         return game
 
@@ -44,9 +47,8 @@ def save_game(game):
 
 def _random_move(board_state):
     """Return a random valid move index for the given board state."""
-    temp_game = TicTacToe()
-    temp_game.board = np.array(board_state)
-    moves = temp_game.get_valid_moves()
+    temp_game = TicTacToe(1, board=np.array(board_state))
+    moves = temp_game.get_valid_moves().tolist()
     return random.choice(range(len(moves))) if moves else 0
 
 
@@ -94,31 +96,39 @@ def make_move():
     if row is None or col is None:
         return jsonify({'error': 'Missing coordinates'}), 400
 
+    if game.is_game_over():
+        return jsonify({"error": "The game is over."}), 400
+
     try:
         # Player Move (X)
-        game_logic.make_move(game, row, col)
+        game.make_move(row, col)
 
         # AI Move (O) if game not over
         if not game.is_game_over():
             board_state = game.board.tolist()
             move_index = _get_next_move(board_state)
-            valid_moves = game.get_valid_moves()
+            valid_moves = game.get_valid_moves().tolist()
 
             if move_index < len(valid_moves):
                 ai_row, ai_col = valid_moves[int(move_index)]
                 game.make_move(ai_row, ai_col)
 
         save_game(game)
+        
+        # In the original UI logic, winner=null means ongoing, winner=0 means draw, winner=X means player X won.
+        # The imported TicTacToe uses 0 for no winner / draw, and 1 or 2 for player wins.
+        winner = None
+        if game.is_game_over():
+            winner = int(game.winner) if game.winner != 0 else 0
+
         return jsonify({
             'board': game.board.tolist(),
-            'winner': game.winner,
+            'winner': winner,
             'over': game.is_game_over()
         })
 
-    except game_logic.InvalidMoveError as e:
-        return jsonify({"error": str(e)}), 400
-    except game_logic.GameOverError as e:
-        return jsonify({"error": str(e)}), 400
+    except ValueError as e:
+        return jsonify({"error": "Invalid move."}), 400
     except Exception as e:
         logging.exception("Move execution failed")
         return jsonify({"error": "Internal server error"}), 500
@@ -126,7 +136,7 @@ def make_move():
 
 @app.route('/reset', methods=['POST'])
 def reset():
-    game = game_logic.init_game()
+    game = init_game()
     save_game(game)
     return jsonify({'board': game.board.tolist()})
 
