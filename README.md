@@ -30,14 +30,11 @@ A simple web-based Tic Tac Toe game built with Python.
 
 ## Usage
 
-1. The game state is now managed using the Flask application context.
-2. Run the application:
-
 1. Run the application:
     ```bash
     python app.py
     ```
-2. Open your browser and go to `http://localhost:5000`
+2. Open your browser and go to `http://localhost:8000`
 
 ## Project Structure
 

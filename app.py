@@ -1,6 +1,6 @@
 import os
 import logging
-import json
+import random
 import requests
 import pickle
 import base64
@@ -17,13 +17,14 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-key-789456123")
 logging.basicConfig(level=logging.INFO)
 
+
 def get_game():
     """Retrieve or initialize game from session."""
     if 'game_state' not in session:
         game = game_logic.init_game()
         save_game(game)
         return game
-    
+
     try:
         # Decode and unpickle the game object from the session
         game_data = base64.b64decode(session['game_state'])
@@ -34,22 +35,33 @@ def get_game():
         save_game(game)
         return game
 
+
 def save_game(game):
     """Serialize and save game to session."""
     game_data = pickle.dumps(game)
     session['game_state'] = base64.b64encode(game_data).decode('utf-8')
 
+
+def _random_move(board_state):
+    """Return a random valid move index for the given board state."""
+    temp_game = TicTacToe()
+    temp_game.board = np.array(board_state)
+    moves = temp_game.get_valid_moves()
+    return random.choice(range(len(moves))) if moves else 0
+
+
 def _get_next_move(board_state):
+    """Call the AI service and return a move index into valid_moves.
+
+    Returns an integer index into game.get_valid_moves(). Falls back to a
+    random valid move index if the service is unavailable or returns an error.
+    """
     url = os.environ.get("ENDPOINT_URL")
     key = os.environ.get("OCP_APIM_SUBSCRIPTION_KEY")
-    
+
     if not url or not key:
         logging.warning("AI credentials missing, falling back to random move")
-        import random
-        temp_game = TicTacToe()
-        temp_game.board = np.array(board_state)
-        moves = temp_game.get_valid_moves()
-        return random.choice(range(len(moves))) if moves else 0
+        return _random_move(board_state)
 
     try:
         headers = {
@@ -65,19 +77,13 @@ def _get_next_move(board_state):
         return response.json()["move"]
     except Exception as e:
         logging.error(f"AI Service Error: {e}")
-        # Fallback to random if external service fails
-        import random
-        temp_game = TicTacToe()
-        temp_game.board = np.array(board_state)
-        moves = temp_game.get_valid_moves()
-        return random.choice(range(len(moves))) if moves else 0
+        return _random_move(board_state)
+
 
 @app.route('/')
 def index():
-    # Ensure a fresh game for a new page load if desired, 
-    # or just let get_game handle it
-    get_game()
     return render_template('index.html')
+
 
 @app.route('/make_move', methods=['POST'])
 def make_move():
@@ -87,17 +93,17 @@ def make_move():
 
     if row is None or col is None:
         return jsonify({'error': 'Missing coordinates'}), 400
-    
+
     try:
         # Player Move (X)
         game_logic.make_move(game, row, col)
-        
+
         # AI Move (O) if game not over
         if not game.is_game_over():
             board_state = game.board.tolist()
             move_index = _get_next_move(board_state)
             valid_moves = game.get_valid_moves()
-            
+
             if move_index < len(valid_moves):
                 ai_row, ai_col = valid_moves[int(move_index)]
                 game.make_move(ai_row, ai_col)
@@ -117,11 +123,13 @@ def make_move():
         logging.exception("Move execution failed")
         return jsonify({"error": "Internal server error"}), 500
 
+
 @app.route('/reset', methods=['POST'])
 def reset():
     game = game_logic.init_game()
     save_game(game)
     return jsonify({'board': game.board.tolist()})
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=8000)
