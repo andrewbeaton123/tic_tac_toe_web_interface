@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusEl = document.getElementById('status');
     const themeToggle = document.getElementById('theme-toggle');
     const themeIcon = document.getElementById('theme-icon');
+    const fallbackNotif = document.getElementById('fallback-notification');
     
     let gameOver = false;
     let waiting = false;
@@ -142,6 +143,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             updateBoard(data.board);
+            
+            // Handle fallback notification
+            if (data.fallback) {
+                fallbackNotif.classList.remove('hidden');
+            } else {
+                fallbackNotif.classList.add('hidden');
+            }
+
             if (data.winner !== null) {
                 gameOver = true;
                 if (data.winner === 0) {
@@ -181,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(response => response.json())
         .then(data => {
             updateBoard(data.board);
+            fallbackNotif.classList.add('hidden'); // Clear on reset
             gameOver = false;
             setWaiting(false);
             setStatus('Your turn \u2014 you are <strong>X</strong>');

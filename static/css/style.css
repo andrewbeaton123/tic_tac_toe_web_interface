@@ -111,6 +111,30 @@ main {
     color: var(--error-color);
 }
 
+#fallback-notification {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background-color: var(--cell-hover);
+    color: var(--text-muted);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+#fallback-notification.hidden {
+    display: none;
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+#fallback-notification svg {
+    color: var(--error-color);
+    flex-shrink: 0;
+}
+
 /* The "thinking" state animation */
 .thinking {
     position: relative;

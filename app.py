@@ -53,17 +53,13 @@ def _random_move(board_state):
 
 
 def _get_next_move(board_state):
-    """Call the AI service and return a move index into valid_moves.
-
-    Returns an integer index into game.get_valid_moves(). Falls back to a
-    random valid move index if the service is unavailable or returns an error.
-    """
+    """Call the AI service and return a (move_index, fallback_flag) tuple."""
     url = os.environ.get("ENDPOINT_URL")
     key = os.environ.get("OCP_APIM_SUBSCRIPTION_KEY")
 
     if not url or not key:
         logging.warning("AI credentials missing, falling back to random move")
-        return _random_move(board_state)
+        return _random_move(board_state), True
 
     try:
         headers = {
@@ -76,14 +72,15 @@ def _get_next_move(board_state):
         }
         response = requests.post(url, headers=headers, json=payload, timeout=5)
         response.raise_for_status()
-        return response.json()["move"]
+        return response.json()["move"], False
     except Exception as e:
         logging.error(f"AI Service Error: {e}")
-        return _random_move(board_state)
+        return _random_move(board_state), True
 
 
 @app.route('/')
 def index():
+    logging.info("Handling request to '/'")
     return render_template('index.html')
 
 
@@ -104,9 +101,10 @@ def make_move():
         game.make_move(row, col)
 
         # AI Move (O) if game not over
+        fallback = False
         if not game.is_game_over():
             board_state = game.board.tolist()
-            move_index = _get_next_move(board_state)
+            move_index, fallback = _get_next_move(board_state)
             valid_moves = game.get_valid_moves().tolist()
 
             if move_index < len(valid_moves):
@@ -124,7 +122,8 @@ def make_move():
         return jsonify({
             'board': game.board.tolist(),
             'winner': winner,
-            'over': game.is_game_over()
+            'over': game.is_game_over(),
+            'fallback': fallback
         })
 
     except ValueError as e:
@@ -136,10 +135,13 @@ def make_move():
 
 @app.route('/reset', methods=['POST'])
 def reset():
+    logging.info("Handling request to '/reset'")
     game = init_game()
     save_game(game)
     return jsonify({'board': game.board.tolist()})
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8000)
+    logging.info("Starting Flask app on port 8001...")
+    # Explicitly bind to 127.0.0.1 for local development
+    app.run(debug=True, host='127.0.0.1', port=8001)
