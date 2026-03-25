@@ -5,14 +5,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeToggle = document.getElementById('theme-toggle');
     const themeIcon = document.getElementById('theme-icon');
     const fallbackNotif = document.getElementById('fallback-notification');
-    
+
     let gameOver = false;
     let waiting = false;
 
     // Theme logic
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const savedTheme = localStorage.getItem('theme');
-    
+
     if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
         document.documentElement.setAttribute('data-theme', 'dark');
         setSunIcon();
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const v1 = boardState[a[0]][a[1]];
             const v2 = boardState[b[0]][b[1]];
             const v3 = boardState[c[0]][c[1]];
-            
+
             if (v1 !== 0 && v1 === v2 && v1 === v3) {
                 winningCells = line;
                 break;
@@ -143,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             updateBoard(data.board);
-            
+
             // Handle fallback notification
             if (data.fallback) {
                 fallbackNotif.classList.remove('hidden');
@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear win highlights early for UX snappiness
         board.classList.remove('game-over');
         document.querySelectorAll('.cell').forEach(c => c.classList.remove('win-highlight'));
-        
+
         setStatus('Initializing game', true);
 
         fetch('/reset', {

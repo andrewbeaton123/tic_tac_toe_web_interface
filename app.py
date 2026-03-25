@@ -68,7 +68,7 @@ def _get_next_move(board_state):
         }
         payload = {
             "current_player": 2,
-            "game_state": [int(i) for l in board_state for i in l]
+            "game_state": [int(i) for position in board_state for i in position]
         }
         response = requests.post(url, headers=headers, json=payload, timeout=5)
         response.raise_for_status()
@@ -87,13 +87,6 @@ def index():
 @app.route('/make_move', methods=['POST'])
 def make_move():
     data = request.get_json()
-<<<<<<< Updated upstream
-    row, col = data['row'], data['col']
-    
-    # For simplicity, we'll use a global game instance
-    global game
-    if not game.is_game_over() and (row, col) in game.get_valid_moves():
-=======
     row, col = data.get('row'), data.get('col')
     game = get_game()
 
@@ -124,15 +117,14 @@ def make_move():
                 logging.warning(f"AI service returned invalid index {move_index}, falling back to local random move")
                 move_index = _random_move(board_state)
                 fallback = True
-            
+
             ai_row, ai_col = valid_moves[int(move_index)]
             game.make_move(ai_row, ai_col)
 
         save_game(game)
->>>>>>> Stashed changes
-        
-            
-            
+
+
+
         game.make_move(row, col)
 
         # AI Move (O) if game not over
@@ -147,7 +139,7 @@ def make_move():
                 game.make_move(ai_row, ai_col)
 
         save_game(game)
-        
+
         # In the original UI logic, winner=null means ongoing, winner=0 means draw, winner=X means player X won.
         # The imported TicTacToe uses 0 for no winner / draw, and 1 or 2 for player wins.
         winner = None
@@ -161,9 +153,9 @@ def make_move():
             'fallback': fallback
         })
 
-    except ValueError as e:
+    except ValueError:
         return jsonify({"error": "Invalid move."}), 400
-    except Exception as e:
+    except Exception:
         logging.exception("Move execution failed")
         return jsonify({"error": "Internal server error"}), 500
 

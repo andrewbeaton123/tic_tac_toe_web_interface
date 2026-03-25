@@ -13,11 +13,11 @@
     --text-muted: #64748b; /* Slate 500 */
     --border-color: #e2e8f0; /* Slate 200 */
     --cell-hover: #f1f5f9; /* Slate 100 */
-    
+
     /* Elegant accents instead of bright primary colors */
     --x-color: #334155; /* Slate 700 - almost black/navy */
     --o-color: #94a3b8; /* Slate 400 - softer gray */
-    
+
     --win-color: #0ea5e9; /* Sky 500 for a subtle win pop */
     --error-color: #ef4444; /* Red 500 */
 }
@@ -29,7 +29,7 @@
     --text-muted: #94a3b8; /* Slate 400 */
     --border-color: #334155; /* Slate 700 */
     --cell-hover: #334155; /* Slate 700 */
-    
+
     --x-color: #f1f5f9; /* Slate 100 */
     --o-color: #64748b; /* Slate 500 */
 }
