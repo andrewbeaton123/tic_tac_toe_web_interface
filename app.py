@@ -87,6 +87,13 @@ def index():
 @app.route('/make_move', methods=['POST'])
 def make_move():
     data = request.get_json()
+<<<<<<< Updated upstream
+    row, col = data['row'], data['col']
+    
+    # For simplicity, we'll use a global game instance
+    global game
+    if not game.is_game_over() and (row, col) in game.get_valid_moves():
+=======
     row, col = data.get('row'), data.get('col')
     game = get_game()
 
@@ -97,7 +104,35 @@ def make_move():
         return jsonify({"error": "The game is over."}), 400
 
     try:
+        # Turn Validation: Ensure it's player 1's turn
+        if game.current_player != 1:
+            logging.warning(f"Rejecting move: current_player is {game.current_player}, expected 1")
+            return jsonify({"error": "It is not your turn."}), 400
+
         # Player Move (X)
+        game.make_move(row, col)
+
+        # AI Move (O) if game not over
+        fallback = False
+        if not game.is_game_over():
+            board_state = game.board.tolist()
+            move_index, fallback = _get_next_move(board_state)
+            valid_moves = game.get_valid_moves().tolist()
+
+            # Ensure the move_index is valid, otherwise force a random move
+            if move_index >= len(valid_moves):
+                logging.warning(f"AI service returned invalid index {move_index}, falling back to local random move")
+                move_index = _random_move(board_state)
+                fallback = True
+            
+            ai_row, ai_col = valid_moves[int(move_index)]
+            game.make_move(ai_row, ai_col)
+
+        save_game(game)
+>>>>>>> Stashed changes
+        
+            
+            
         game.make_move(row, col)
 
         # AI Move (O) if game not over
