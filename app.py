@@ -1,71 +1,147 @@
-from flask import Flask, render_template, request, jsonify
+import os
 import logging
+import random
 import requests
-import json
-from tic_tac_toe_game import TicTacToe  # Import your TicTacToe class
+import pickle
+import base64
+import numpy as np
+from flask import Flask, render_template, request, jsonify, session
+from dotenv import load_dotenv
+from tic_tac_toe_game import TicTacToe
+
+load_dotenv()
 
 app = Flask(__name__)
+# Use a consistent secret key for sessions
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-key-789456123")
 logging.basicConfig(level=logging.INFO)
+
+
+def init_game():
+    return TicTacToe(1)
+
+
+def get_game():
+    """Retrieve or initialize game from session."""
+    if 'game_state' not in session:
+        game = init_game()
+        save_game(game)
+        return game
+
+    try:
+        # Decode and unpickle the game object from the session
+        game_data = base64.b64decode(session['game_state'])
+        return pickle.loads(game_data)
+    except Exception as e:
+        logging.error(f"Failed to load game from session: {e}")
+        game = init_game()
+        save_game(game)
+        return game
+
+
+def save_game(game):
+    """Serialize and save game to session."""
+    game_data = pickle.dumps(game)
+    session['game_state'] = base64.b64encode(game_data).decode('utf-8')
+
+
+def _random_move(board_state):
+    """Return a random valid move index for the given board state."""
+    temp_game = TicTacToe(1, board=np.array(board_state))
+    moves = temp_game.get_valid_moves().tolist()
+    return random.choice(range(len(moves))) if moves else 0
+
+
+def _get_next_move(board_state):
+    """Call the AI service and return a (move_index, fallback_flag) tuple."""
+    url = os.environ.get("ENDPOINT_URL")
+    key = os.environ.get("OCP_APIM_SUBSCRIPTION_KEY")
+
+    if not url or not key:
+        logging.warning("AI credentials missing, falling back to random move")
+        return _random_move(board_state), True
+
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "ocp-apim-subscription-key": key
+        }
+        payload = {
+            "current_player": 2,
+            "game_state": [int(i) for l in board_state for i in l]
+        }
+        response = requests.post(url, headers=headers, json=payload, timeout=5)
+        response.raise_for_status()
+        return response.json()["move"], False
+    except Exception as e:
+        logging.error(f"AI Service Error: {e}")
+        return _random_move(board_state), True
+
 
 @app.route('/')
 def index():
+    logging.info("Handling request to '/'")
     return render_template('index.html')
+
 
 @app.route('/make_move', methods=['POST'])
 def make_move():
     data = request.get_json()
-    row, col = data['row'], data['col']
-    
-    # For simplicity, we'll use a global game instance
-    global game
-    if not game.is_game_over() and (row, col) in game.get_valid_moves():
-        
-            
-            
+    row, col = data.get('row'), data.get('col')
+    game = get_game()
+
+    if row is None or col is None:
+        return jsonify({'error': 'Missing coordinates'}), 400
+
+    if game.is_game_over():
+        return jsonify({"error": "The game is over."}), 400
+
+    try:
+        # Player Move (X)
         game.make_move(row, col)
-        winner = game.winner
-        board_state = game.board.tolist()
-        #
-        try:
 
-            url = "http://127.0.0.1:8000/next_move"
-            headers = {"Content-Type": "application/json"}
-            payload = {
-            "current_player": 2,
-            "game_state": board_state
-                }
-            try:
-                response = requests.post(url, headers=headers, data=json.dumps(payload))
-                response.raise_for_status()  # Raise an exception for bad status codes
-                next_move = response.json()["move"]
-                logging.info(f"Next Move:{next_move}")
-                game.make_move(*game.get_valid_moves()[int(next_move)])  
-                final_board = game.board.tolist()
-                winner = game.winner
-                return jsonify({'board': final_board, 'winner': winner})
-            
-            except requests.exceptions.RequestException as e:
-                print(f"Error sending request: {e}")
-                return jsonify({"error":f"There was an error with the game server {e}"})
+        # AI Move (O) if game not over
+        fallback = False
+        if not game.is_game_over():
+            board_state = game.board.tolist()
+            move_index, fallback = _get_next_move(board_state)
+            valid_moves = game.get_valid_moves().tolist()
 
-            
-            except json.JSONDecodeError:
-                print("Error decoding JSON response.")
-            
-        except ValueError as e:
-            logging.error(f"Invalid move: {e}")
-            return jsonify({'error': str(e)}), 400
-    
-    return jsonify({'error': "Move not valid or game over"}), 400
+            if move_index < len(valid_moves):
+                ai_row, ai_col = valid_moves[int(move_index)]
+                game.make_move(ai_row, ai_col)
+
+        save_game(game)
+        
+        # In the original UI logic, winner=null means ongoing, winner=0 means draw, winner=X means player X won.
+        # The imported TicTacToe uses 0 for no winner / draw, and 1 or 2 for player wins.
+        winner = None
+        if game.is_game_over():
+            winner = int(game.winner) if game.winner != 0 else 0
+
+        return jsonify({
+            'board': game.board.tolist(),
+            'winner': winner,
+            'over': game.is_game_over(),
+            'fallback': fallback
+        })
+
+    except ValueError as e:
+        return jsonify({"error": "Invalid move."}), 400
+    except Exception as e:
+        logging.exception("Move execution failed")
+        return jsonify({"error": "Internal server error"}), 500
+
 
 @app.route('/reset', methods=['POST'])
 def reset():
-    logging.info("Board Reset Started")
-    global game
-    game.reset()
-    #game.board.tolist()
+    logging.info("Handling request to '/reset'")
+    game = init_game()
+    save_game(game)
     return jsonify({'board': game.board.tolist()})
 
+
 if __name__ == '__main__':
-    game = TicTacToe(starting_player=1)
-    app.run(debug=True)
+    logging.info("Starting Flask app on port 8001...")
+    # Explicitly bind to 127.0.0.1 for local development
+    app.run(debug=True, host='127.0.0.1', port=8001)
