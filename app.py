@@ -123,23 +123,6 @@ def make_move():
 
         save_game(game)
 
-
-
-        game.make_move(row, col)
-
-        # AI Move (O) if game not over
-        fallback = False
-        if not game.is_game_over():
-            board_state = game.board.tolist()
-            move_index, fallback = _get_next_move(board_state)
-            valid_moves = game.get_valid_moves().tolist()
-
-            if move_index < len(valid_moves):
-                ai_row, ai_col = valid_moves[int(move_index)]
-                game.make_move(ai_row, ai_col)
-
-        save_game(game)
-
         # In the original UI logic, winner=null means ongoing, winner=0 means draw, winner=X means player X won.
         # The imported TicTacToe uses 0 for no winner / draw, and 1 or 2 for player wins.
         winner = None
