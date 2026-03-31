@@ -5,23 +5,23 @@ import requests
 import pickle
 import base64
 import numpy as np
+from typing import Any
 from flask import Flask, render_template, request, jsonify, session
 from dotenv import load_dotenv
 from tic_tac_toe_game import TicTacToe
 
 load_dotenv()
-
 app = Flask(__name__)
 # Use a consistent secret key for sessions
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-key-789456123")
 logging.basicConfig(level=logging.INFO)
 
 
-def init_game():
+def init_game() -> TicTacToe:
     return TicTacToe(1)
 
 
-def get_game():
+def get_game() -> TicTacToe:
     """Retrieve or initialize game from session."""
     if 'game_state' not in session:
         game = init_game()
@@ -39,20 +39,20 @@ def get_game():
         return game
 
 
-def save_game(game):
+def save_game(game: TicTacToe) -> None:
     """Serialize and save game to session."""
     game_data = pickle.dumps(game)
     session['game_state'] = base64.b64encode(game_data).decode('utf-8')
 
 
-def _random_move(board_state):
+def _random_move(board_state: list[list[int]]) -> int:
     """Return a random valid move index for the given board state."""
     temp_game = TicTacToe(1, board=np.array(board_state))
     moves = temp_game.get_valid_moves().tolist()
     return random.choice(range(len(moves))) if moves else 0
 
 
-def _get_next_move(board_state):
+def _get_next_move(board_state: list[list[int]]) -> tuple[int, bool]:
     """Call the AI service and return a (move_index, fallback_flag) tuple."""
     url = os.environ.get("ENDPOINT_URL")
     key = os.environ.get("OCP_APIM_SUBSCRIPTION_KEY")
@@ -79,13 +79,13 @@ def _get_next_move(board_state):
 
 
 @app.route('/')
-def index():
+def index() -> Any:
     logging.info("Handling request to '/'")
     return render_template('index.html')
 
 
 @app.route('/make_move', methods=['POST'])
-def make_move():
+def make_move() -> Any:
     data = request.get_json()
     row, col = data.get('row'), data.get('col')
     game = get_game()
@@ -144,7 +144,7 @@ def make_move():
 
 
 @app.route('/reset', methods=['POST'])
-def reset():
+def reset() -> Any:
     logging.info("Handling request to '/reset'")
     game = init_game()
     save_game(game)
