@@ -16,3 +16,4 @@ repos:
     hooks:
       - id: mypy
         args: []
+        additional_dependencies: [types-requests]
