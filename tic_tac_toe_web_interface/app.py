@@ -5,7 +5,7 @@ import requests
 import pickle
 import base64
 import numpy as np
-from typing import Any
+from typing import Any, cast
 from flask import Flask, render_template, request, jsonify, session
 from dotenv import load_dotenv
 from tic_tac_toe_game import TicTacToe
@@ -31,7 +31,7 @@ def get_game() -> TicTacToe:
     try:
         # Decode and unpickle the game object from the session
         game_data = base64.b64decode(session['game_state'])
-        return pickle.loads(game_data)
+        return cast(TicTacToe, pickle.loads(game_data))
     except Exception as e:
         logging.error(f"Failed to load game from session: {e}")
         game = init_game()
@@ -48,7 +48,7 @@ def save_game(game: TicTacToe) -> None:
 def _random_move(board_state: list[list[int]]) -> int:
     """Return a random valid move index for the given board state."""
     temp_game = TicTacToe(1, board=np.array(board_state))
-    moves = temp_game.get_valid_moves().tolist()
+    moves = temp_game.get_valid_moves()
     return random.choice(range(len(moves))) if moves else 0
 
 
@@ -110,7 +110,7 @@ def make_move() -> Any:
         if not game.is_game_over():
             board_state = game.board.tolist()
             move_index, fallback = _get_next_move(board_state)
-            valid_moves = game.get_valid_moves().tolist()
+            valid_moves = game.get_valid_moves()
 
             # Ensure the move_index is valid, otherwise force a random move
             if move_index >= len(valid_moves):
@@ -127,7 +127,7 @@ def make_move() -> Any:
         # The imported TicTacToe uses 0 for no winner / draw, and 1 or 2 for player wins.
         winner = None
         if game.is_game_over():
-            winner = int(game.winner) if game.winner != 0 else 0
+            winner = int(game.winner) if game.winner else 0
 
         return jsonify({
             'board': game.board.tolist(),
