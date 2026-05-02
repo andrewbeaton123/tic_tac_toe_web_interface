@@ -5,8 +5,9 @@ import requests
 import pickle
 import base64
 import numpy as np
+import msal
 from typing import Any, cast
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from dotenv import load_dotenv
 from tic_tac_toe_game import TicTacToe
 
@@ -16,6 +17,19 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-key-789456123")
 logging.basicConfig(level=logging.INFO)
 
+# Azure Entra Config
+CLIENT_ID = os.environ.get("AZURE_CLIENT_ID")
+CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
+TENANT_ID = os.environ.get("AZURE_TENANT_ID")
+AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
+# The scope you defined: api://<CLIENT_ID>/users
+API_SCOPE = os.environ.get("API_SCOPE")
+SCOPE = [API_SCOPE] if API_SCOPE else ["User.Read"]
+
+def _build_msal_app() -> msal.ConfidentialClientApplication:
+    return msal.ConfidentialClientApplication(
+        CLIENT_ID, authority=AUTHORITY,
+        client_credential=CLIENT_SECRET)
 
 def init_game() -> TicTacToe:
     return TicTacToe(1)
@@ -49,23 +63,36 @@ def _random_move(board_state: list[list[int]]) -> int:
     """Return a random valid move index for the given board state."""
     temp_game = TicTacToe(1, board=np.array(board_state))
     moves = temp_game.get_valid_moves()
-    return random.choice(range(len(moves))) if moves else 0
+    # moves is a numpy array of [row, col] pairs
+    return random.choice(range(len(moves))) if len(moves) > 0 else 0
 
 
 def _get_next_move(board_state: list[list[int]]) -> tuple[int, bool]:
     """Call the AI service and return a (move_index, fallback_flag) tuple."""
     url = os.environ.get("ENDPOINT_URL")
-    key = os.environ.get("OCP_APIM_SUBSCRIPTION_KEY")
 
-    if not url or not key:
-        logging.warning("AI credentials missing, falling back to random move")
+    # In User Identity flow, we use the JWT from the session
+    token_dict = session.get("user_token")
+    if not token_dict:
+        logging.warning("No user token found in session, AI move will fail")
+        return _random_move(board_state), True
+
+    access_token = token_dict.get("access_token")
+
+    if not url or not access_token:
+        logging.warning("AI credentials or token missing, falling back to random move")
         return _random_move(board_state), True
 
     try:
         headers = {
             "Content-Type": "application/json",
-            "ocp-apim-subscription-key": key
+            "Authorization": f"Bearer {access_token}"
         }
+        # Some Azure APIM configurations still require the subscription key
+        key = os.environ.get("OCP_APIM_SUBSCRIPTION_KEY")
+        if key:
+            headers["ocp-apim-subscription-key"] = key
+
         payload = {
             "current_player": 2,
             "game_state": [int(i) for position in board_state for i in position]
@@ -81,8 +108,58 @@ def _get_next_move(board_state: list[list[int]]) -> tuple[int, bool]:
 @app.route('/')
 def index() -> Any:
     logging.info("Handling request to '/'")
+    if not session.get("user_token"):
+        return redirect(url_for("login"))
     return render_template('index.html')
 
+
+@app.route("/login")
+def login() -> Any:
+    msal_app = _build_msal_app()
+    redirect_uri = url_for("authorized", _external=True)
+    logging.info(f"Generated Redirect URI for Login: {redirect_uri}")
+    auth_url = msal_app.get_authorization_request_url(
+        SCOPE,
+        redirect_uri=redirect_uri)
+    return redirect(auth_url)
+
+
+@app.route("/getAToken")  # Must match the Redirect URI in Entra
+def authorized() -> Any:
+    redirect_uri = url_for("authorized", _external=True)
+    logging.info(f"Generated Redirect URI for Callback: {redirect_uri}")
+
+    if request.args.get('error'):
+        return f"Login Error: {request.args.get('error_description')}"
+
+    if request.args.get('code'):
+        msal_app = _build_msal_app()
+        result = msal_app.acquire_token_by_authorization_code(
+            request.args['code'],
+            scopes=SCOPE,
+            redirect_uri=redirect_uri)
+        if "error" in result:
+            logging.error(f"MSAL Error: {result.get('error')}, Description: {result.get('error_description')}")
+            return f"Login failure: {result.get('error_description')}"
+
+        # MINIMIZE SESSION SIZE: Flask sessions are stored in cookies (max 4KB).
+        # We only store what we strictly need for the UI and the API call.
+        session["user_token"] = {
+            "access_token": result.get("access_token"),
+            "name": result.get("id_token_claims", {}).get("name")
+        }
+    return redirect(url_for("index"))
+
+
+@app.route('/logout')
+def logout() -> Any:
+    # Clear session and redirect to Microsoft logout for a clean slate
+    session.clear()
+    tenant = os.environ.get("AZURE_TENANT_ID")
+    return redirect(
+        f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/logout"
+        f"?post_logout_redirect_uri={url_for('index', _external=True)}"
+    )
 
 @app.route('/make_move', methods=['POST'])
 def make_move() -> Any:
@@ -104,6 +181,7 @@ def make_move() -> Any:
 
         # Player Move (X)
         game.make_move(row, col)
+        logging.info(f"Player moved to {row}, {col}")
 
         # AI Move (O) if game not over
         fallback = False
@@ -136,10 +214,11 @@ def make_move() -> Any:
             'fallback': fallback
         })
 
-    except ValueError:
+    except ValueError as e:
+        logging.error(f"ValueError in make_move: {e}")
         return jsonify({"error": "Invalid move."}), 400
-    except Exception:
-        logging.exception("Move execution failed")
+    except Exception as e:
+        logging.exception(f"Unexpected Exception in make_move: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
 
